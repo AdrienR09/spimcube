@@ -46,7 +46,7 @@ class Spim:
 
     """
 
-    def __init__(self, clean_spike=False, scan_direction='h', zigzag=False, scan_unit='step'):
+    def __init__(self, path, filename, clean_spike=False, scan_direction='h', zigzag=False, scan_unit='step'):
 
         """
         Parameters
@@ -54,7 +54,7 @@ class Spim:
         clean_spike : bool (default : False)
             If True, the method ``intensity_map`` returns an image after cleaning the spikes with
             ``despike.clean``. BEWARE!!! This slows down the interaction with the image by a factor 450.
-                      
+
         scan_direction : one of ('hlb'='hl'='h', 'hrb'='hr', 'hlt', 'hrt', 'vtl'='vt'='v', 'vbl'='vb', 'vtr', vbr').
             Default is 'hlb'.
             1st letter : indicates the type of scan: h(orizontal), v(ertical).
@@ -62,18 +62,19 @@ class Spim:
             t (top to bottom), b (bottom to top).
             3rd letter : indicates the starting corner: b(ottom), t(op), l(eft), r(ight),
             which complete the description of the scan orientation depending on the preceding letters.
-            
+
             Example: 'hlb' means scanning by successive horizontal lines from left to right starting at the bottom left corner.
                      'vtr' means scanning by successive vertical lines from top to bottom starting at the top right corner.
                      'h' is equivalent to 'hl' and to 'hlb' because it is thought to as the logic way when scanning horizontally.
                      Same for 'v', 'vt' and 'vtl', when scanning vertically.
-                         
-        zigzag : bool. Indicates whether the scan is performed in zigzag mode or not. Default: False.
 
+        zigzag : bool. Indicates whether the scan is performed in zigzag mode or not. Default: False.
         scan_unit : str. Define the unit of the step in the scan.
             Example: 'µm' is the default, it can also be piezo stepper step, which are not equal to micrometer.
-        
+
         """
+        self.path = path
+        self.filename = filename
 
         # Scan attributes
         self.scan_direction = scan_direction
