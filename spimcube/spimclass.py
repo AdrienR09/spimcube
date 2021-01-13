@@ -54,7 +54,7 @@ class Spim:
         clean_spike : bool (default : False)
             If True, the method ``intensity_map`` returns an image after cleaning the spikes with
             ``despike.clean``. BEWARE!!! This slows down the interaction with the image by a factor 450.
-                      
+
         scan_direction : one of ('hlb'='hl'='h', 'hrb'='hr', 'hlt', 'hrt', 'vtl'='vt'='v', 'vbl'='vb', 'vtr', vbr').
             Default is 'hlb'.
             1st letter : indicates the type of scan: h(orizontal), v(ertical).
@@ -62,17 +62,16 @@ class Spim:
             t (top to bottom), b (bottom to top).
             3rd letter : indicates the starting corner: b(ottom), t(op), l(eft), r(ight),
             which complete the description of the scan orientation depending on the preceding letters.
-            
+
             Example: 'hlb' means scanning by successive horizontal lines from left to right starting at the bottom left corner.
                      'vtr' means scanning by successive vertical lines from top to bottom starting at the top right corner.
                      'h' is equivalent to 'hl' and to 'hlb' because it is thought to as the logic way when scanning horizontally.
                      Same for 'v', 'vt' and 'vtl', when scanning vertically.
-                         
-        zigzag : bool. Indicates whether the scan is performed in zigzag mode or not. Default: False.
 
+        zigzag : bool. Indicates whether the scan is performed in zigzag mode or not. Default: False.
         scan_unit : str. Define the unit of the step in the scan.
             Example: 'µm' is the default, it can also be piezo stepper step, which are not equal to micrometer.
-        
+
         """
         self.path = path
         self.filename = filename
@@ -104,13 +103,53 @@ class Spim:
     # Initialization methods: each method is intended to extract and process a certain format of raw data.
     # Make a new one for each new format of data.
 
-    def initialization_qudi(self):
+    def initialization_numpy(self, spim_data, x, y, wavelength, z=0):
+        """
+
+        @spim_data : (narray) spim data cube for the each positional-spectral coordinates (x, y, wavelength).
+        @x : (narray) positional vector containing all the positions along one dimension.
+        @y : (narray) positional vector containing all the positions along one dimension.
+        @wavelength : (narray) spectral vector containing all the wavelength features.
+        @z : (narray) - optional argument - spectral vector containing all the wavelength features.
+
+        NB : the step values are taken to be constant for each positional-spectral vectors = the difference between the
+        two first values of the vectors
+        """
+
+        self.scan_unit = 'step'
+
+        self.start_x = round(float(x[0]) * 1e6, 3)
+        self.start_y = round(float(y[0]) * 1e6, 3)
+        self.xstep_value = round(float(x[1]-x[0]) * 1e6, 3)
+        self.ystep_value = round(float(y[1]-y[0]) * 1e6, 3)
+        self.xstep_number, self.ystep_number = x.size, y.size
+        self.CCD_nb_pixel = wavelength.size
+
+        x = x[:, np.newaxis] * 1e6
+        y = y[:, np.newaxis] * 1e6
+        coordinate = np.concatenate((x, y), axis=1)
+
+        self.tab_lambda = np.array([round(float(s) * 1e9, ndigits=3) for s in wavelength])
+        if len(self.tab_lambda) != self.CCD_nb_pixel:
+            raise ValueError(
+                "The number of CCD pixels given in metadata does not match the number of wavelengths in data.")
+
+        # Check and fix incomplete scan.
+        data = self._fix_incomplete_scan(spim_data)
+        self._shape3Dmatrix(data)
+
+        # Define default space range of the map.
+        self.define_space_range(coordinate=coordinate)
+
+    def initialization_qudi(self, path, filename):
         """Use this function to initialize the SPIM with compressed '.npz' file from Qudi - L2C.
 
         Note: currently nothing is done with the z coordinates. It is only add to the attribute of the ``spim`` with
         the same shaped numpy array as the x & y arrays.
 
         """
+        self.path = path
+        self.filename = filename
         complete_path = self.path + self.filename
         data_file = complete_path + '.npz'
         metadata_file = complete_path + '.dat'
@@ -177,9 +216,12 @@ class Spim:
     def initialization(self):
         """This void function is used to issue a deprecation warning."""
         raise DeprecationWarning("This function name has changed, use ``initialization_labviewL2C`` instead.")
-    def initialization_labviewL2C(self):
+
+    def initialization_labviewL2C(self, path, filename):
         """Use this function to initialize the SPIM with binary datafile from L2C - Labview."""
         # Create the complete filenames with extension.
+        self.path = path
+        self.filename = filename
         complete_path = self.path + self.filename
         data_file = complete_path + ".dat"
         lambda_file = complete_path + ".lambda"
@@ -213,7 +255,7 @@ class Spim:
         # Define default space range of the map.
         self.define_space_range()
 
-    def initialization_textfile(self, xstep_number=None, ystep_number=None, xstep_value=None, ystep_value=None,
+    def initialization_textfile(self, path, filename, xstep_number=None, ystep_number=None, xstep_value=None, ystep_value=None,
                                 CCD_nb_pixel='auto', data_reversed=False):
         """Use this function to initialize the ``Spim`` with text formatted datafile.
         
@@ -238,6 +280,8 @@ class Spim:
             - integer : user defined value.
 
         """
+        self.path = path
+        self.filename = filename
         complete_path = self.path + self.filename + ".txt"
 
         self.scan_unit = 'step'
